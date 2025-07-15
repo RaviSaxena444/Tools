@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PDF to Word Converter</title>
+
+  <!-- PDF.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+
+  <!-- docx library -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/docx/8.4.0/docx.umd.js"></script>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f0f2f5;
+      padding: 20px;
+      color: #333;
+    }
+
+    .container {
+      max-width: 600px;
+      margin: auto;
+      background: #fff;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+
+    h1 {
+      text-align: center;
+      color: #4a6bff;
+    }
+
+    input[type="file"] {
+      display: block;
+      margin: 20px auto;
+    }
+
+    .btn {
+      display: block;
+      width: 100%;
+      padding: 12px;
+      background: #4a6bff;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 16px;
+      margin-top: 20px;
+    }
+
+    .btn:disabled {
+      background: #999;
+      cursor: not-allowed;
+    }
+
+    #status {
+      text-align: center;
+      margin-top: 15px;
+      color: #555;
+    }
+
+    @media (max-width: 600px) {
+      .container {
+        padding: 20px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>PDF to Word Converter</h1>
+
+    <input type="file" id="pdfFile" accept="application/pdf" />
+    <button id="convertBtn" class="btn" disabled>Convert to Word</button>
+    <div id="status"></div>
+  </div>
+
+  <script>
+    const pdfInput = document.getElementById('pdfFile');
+    const convertBtn = document.getElementById('convertBtn');
+    const status = document.getElementById('status');
+
+    let pdfData = null;
+
+    pdfInput.addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file || file.type !== 'application/pdf') {
+        status.textContent = "Please upload a valid PDF file.";
+        convertBtn.disabled = true;
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = function () {
+        pdfData = new Uint8Array(reader.result);
+        status.textContent = "PDF loaded. Ready to convert.";
+        convertBtn.disabled = false;
+      };
+      reader.readAsArrayBuffer(file);
+    });
+
+    convertBtn.addEventListener('click', async () => {
+      if (!pdfData) return;
+
+      status.textContent = "Converting PDF to Word... Please wait.";
+
+      const loadingTask = pdfjsLib.getDocument({ data: pdfData });
+      const pdf = await loadingTask.promise;
+
+      let fullText = "";
+
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const textContent = await page.getTextContent();
+        const pageText = textContent.items.map(item => item.str).join(' ');
+        fullText += pageText + '\n\n';
+      }
+
+      // Create Word document
+      const doc = new docx.Document({
+        sections: [{
+          properties: {},
+          children: [
+            new docx.Paragraph({
+              children: [
+                new docx.TextRun(fullText)
+              ]
+            })
+          ]
+        }]
+      });
+
+      const packer = new docx.Packer();
+      const blob = await packer.toBlob(doc);
+
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "converted.docx";
+      a.click();
+
+      status.textContent = "Conversion complete. Word file downloaded.";
+    });
+  </script>
+</body>
+</html>
